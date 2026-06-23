@@ -1,0 +1,822 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta name="x-poe-datastore-behavior" content="local_only"><meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.jquery.com https://unpkg.com https://d3js.org https://threejs.org https://cdn.plot.ly https://stackpath.bootstrapcdn.com https://maps.googleapis.com https://cdn.tailwindcss.com https://ajax.googleapis.com https://kit.fontawesome.com https://cdn.datatables.net https://maxcdn.bootstrapcdn.com https://code.highcharts.com https://tako-static-assets-production.s3.amazonaws.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://pfst.cf2.poecdn.net https://puc.poecdn.net https://i.imgur.com https://wikimedia.org https://*.icons8.com https://*.giphy.com https://picsum.photos https://images.unsplash.com; frame-src 'self' https://www.youtube.com https://trytako.com; child-src 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests; block-all-mixed-content;">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>练琴节拍器</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei",
+        sans-serif;
+      background: linear-gradient(135deg, #263244, #374151);
+      color: #f9fafb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .metronome {
+      width: 100%;
+      max-width: 500px;
+      background: rgba(17, 24, 39, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 28px;
+      padding: 28px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+    }
+
+    h1 {
+      text-align: center;
+      margin: 0 0 8px;
+      font-size: 30px;
+      letter-spacing: 2px;
+    }
+
+    .hint {
+      text-align: center;
+      color: #9ca3af;
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
+
+    .bpm-display {
+      text-align: center;
+      margin-bottom: 22px;
+    }
+
+    .bpm-number {
+      width: 100%;
+      border: 1px solid transparent;
+      border-radius: 14px;
+      background: transparent;
+      font-size: 72px;
+      font-weight: 800;
+      line-height: 1;
+      color: #facc15;
+      outline: none;
+      text-align: center;
+      cursor: default;
+      appearance: textfield;
+    }
+
+    .bpm-number::-webkit-inner-spin-button,
+    .bpm-number::-webkit-outer-spin-button {
+      appearance: none;
+      margin: 0;
+    }
+
+    .bpm-number.editing {
+      border-color: #facc15;
+      background: #111827;
+      box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.18);
+      cursor: text;
+    }
+
+    .bpm-label {
+      color: #d1d5db;
+      margin-top: 6px;
+      font-size: 16px;
+    }
+
+    .tempo-controls {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      border: none;
+      border-radius: 14px;
+      padding: 13px 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #f9fafb;
+      background: #374151;
+      transition: transform 0.08s ease, background 0.2s ease, box-shadow 0.2s ease;
+      user-select: none;
+    }
+
+    button:hover {
+      background: #4b5563;
+    }
+
+    button:active {
+      transform: scale(0.96);
+    }
+
+    .start-btn {
+      width: 100%;
+      padding: 18px;
+      font-size: 22px;
+      margin: 18px 0 24px;
+      background: linear-gradient(135deg, #16a34a, #22c55e);
+      box-shadow: 0 10px 28px rgba(34, 197, 94, 0.25);
+    }
+
+    .start-btn.running {
+      background: linear-gradient(135deg, #dc2626, #ef4444);
+      box-shadow: 0 10px 28px rgba(239, 68, 68, 0.25);
+    }
+
+    .practice-timer {
+      margin: -10px 0 24px;
+      text-align: center;
+      color: #9ca3af;
+      font-size: 14px;
+    }
+
+    .practice-time {
+      display: block;
+      margin-top: 5px;
+      color: #f9fafb;
+      font-size: 28px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 2px;
+    }
+
+    .practice-timer.running .practice-time {
+      color: #22c55e;
+    }
+
+    .bpm-slider {
+      width: 100%;
+      accent-color: #facc15;
+      height: 34px;
+      margin: 2px 0 22px;
+      cursor: pointer;
+      appearance: none;
+      background: transparent;
+    }
+
+    .bpm-slider::-webkit-slider-runnable-track {
+      height: 14px;
+      border-radius: 999px;
+      background: #4b5563;
+    }
+
+    .bpm-slider::-webkit-slider-thumb {
+      width: 30px;
+      height: 30px;
+      margin-top: -8px;
+      border: 3px solid #111827;
+      border-radius: 50%;
+      background: #facc15;
+      box-shadow: 0 2px 10px rgba(250, 204, 21, 0.45);
+      appearance: none;
+    }
+
+    .bpm-slider::-moz-range-track {
+      height: 14px;
+      border-radius: 999px;
+      background: #4b5563;
+    }
+
+    .bpm-slider::-moz-range-thumb {
+      width: 26px;
+      height: 26px;
+      border: 3px solid #111827;
+      border-radius: 50%;
+      background: #facc15;
+      box-shadow: 0 2px 10px rgba(250, 204, 21, 0.45);
+    }
+
+    .section {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .volume-control {
+      display: grid;
+      grid-template-columns: auto 1fr 48px;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .volume-control input {
+      width: 100%;
+      accent-color: #facc15;
+      margin: 0;
+    }
+
+    .volume-value {
+      color: #facc15;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    label {
+      color: #d1d5db;
+      font-size: 15px;
+    }
+
+    select {
+      width: 150px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #4b5563;
+      background: #111827;
+      color: #f9fafb;
+      font-size: 15px;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+    }
+
+    .toggle input {
+      width: 20px;
+      height: 20px;
+      accent-color: #facc15;
+      cursor: pointer;
+    }
+
+    .beats {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 22px;
+    }
+
+    .beat {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #374151;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #9ca3af;
+      transition: 0.08s ease;
+    }
+
+    .beat.active {
+      background: #facc15;
+      color: #111827;
+      transform: scale(1.22);
+      box-shadow: 0 0 20px rgba(250, 204, 21, 0.75);
+    }
+
+    .beat.accent.active {
+      background: #ef4444;
+      color: white;
+      box-shadow: 0 0 26px rgba(239, 68, 68, 0.85);
+    }
+
+    .status {
+      text-align: center;
+      color: #9ca3af;
+      font-size: 14px;
+      margin-top: 18px;
+      min-height: 20px;
+    }
+
+    .tap-btn {
+      width: 100%;
+      margin-top: 8px;
+      background: #2563eb;
+    }
+
+    .tap-btn:hover {
+      background: #3b82f6;
+    }
+
+    .advanced-settings {
+      margin-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .advanced-settings summary {
+      padding: 18px 4px 4px;
+      color: #9ca3af;
+      font-size: 15px;
+      font-weight: 700;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .advanced-settings summary:hover {
+      color: #facc15;
+    }
+
+    .advanced-content {
+      padding-top: 18px;
+    }
+
+    @media (max-width: 420px) {
+      .metronome {
+        padding: 22px;
+      }
+
+      .bpm-number {
+        font-size: 60px;
+      }
+
+      .tempo-controls {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .volume-control {
+        grid-template-columns: 1fr auto;
+      }
+
+      .volume-control input {
+        grid-column: 1 / -1;
+        grid-row: 2;
+      }
+
+      select {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="metronome">
+    <h1>节拍器</h1>
+    <div class="hint">空格键：开始 / 停止；双击 BPM 数字可直接修改</div>
+
+    <div class="bpm-display">
+      <input class="bpm-number" type="number" id="bpmNumber" min="30" max="240"
+        value="80" inputmode="numeric" readonly aria-label="BPM，双击修改" title="双击修改 BPM">
+      <div class="bpm-label">BPM</div>
+    </div>
+
+    <input class="bpm-slider" type="range" id="bpmSlider" min="30" max="240" value="80"
+      aria-label="调整 BPM">
+
+    <div class="tempo-controls">
+      <button id="minus10">-10</button>
+      <button id="minus1">-1</button>
+      <button id="plus1">+1</button>
+      <button id="plus10">+10</button>
+    </div>
+
+    <button class="start-btn" id="startStopBtn">开始</button>
+
+    <div class="practice-timer" id="practiceTimer">
+      本次练习时长
+      <time class="practice-time" id="practiceTime">00:00:00</time>
+    </div>
+
+    <details class="advanced-settings" id="advancedSettings">
+      <summary>更多设置</summary>
+      <div class="advanced-content">
+        <div class="row">
+          <label for="beatsPerBar">每小节拍数 / 重音周期</label>
+          <select id="beatsPerBar">
+            <option value="1">1 拍</option>
+            <option value="2">2/4</option>
+            <option value="3">3/4</option>
+            <option value="4" selected="">4/4</option>
+            <option value="5">5 拍</option>
+            <option value="6">6/8</option>
+            <option value="7">7 拍</option>
+            <option value="8">8 拍</option>
+            <option value="9">9 拍</option>
+            <option value="12">12 拍</option>
+          </select>
+        </div>
+
+        <div class="volume-control">
+          <label for="volumeSlider">音量</label>
+          <input type="range" id="volumeSlider" min="0" max="100" value="100" aria-label="节拍器音量">
+          <output class="volume-value" id="volumeValue" for="volumeSlider">100%</output>
+        </div>
+
+        <div class="row">
+          <label class="toggle">
+            <input type="checkbox" id="accentToggle" checked="">
+            开启第一拍重音
+          </label>
+        </div>
+
+        <button class="tap-btn" id="tapBtn">Tap Tempo</button>
+      </div>
+    </details>
+
+    <div class="beats" id="beatsContainer"></div>
+
+    <div class="status" id="status">
+      准备好了
+    </div>
+  </div>
+
+  <script>
+    const bpmNumber = document.getElementById("bpmNumber");
+    const bpmSlider = document.getElementById("bpmSlider");
+    const startStopBtn = document.getElementById("startStopBtn");
+    const beatsPerBarSelect = document.getElementById("beatsPerBar");
+    const accentToggle = document.getElementById("accentToggle");
+    const beatsContainer = document.getElementById("beatsContainer");
+    const statusText = document.getElementById("status");
+    const tapBtn = document.getElementById("tapBtn");
+    const volumeSlider = document.getElementById("volumeSlider");
+    const volumeValue = document.getElementById("volumeValue");
+    const practiceTimer = document.getElementById("practiceTimer");
+    const practiceTime = document.getElementById("practiceTime");
+
+    const minus10 = document.getElementById("minus10");
+    const minus1 = document.getElementById("minus1");
+    const plus1 = document.getElementById("plus1");
+    const plus10 = document.getElementById("plus10");
+
+    let bpm = 80;
+    let isRunning = false;
+    let currentBeat = 0;
+    let timerId = null;
+    let audioContext = null;
+    let tapTimes = [];
+    let volume = 1;
+    let practiceTimerId = null;
+    let practiceStartedAt = null;
+    const storageKey = "metronomeSettings";
+
+    function saveSettings() {
+      const settings = {
+        bpm,
+        volume: Number(volumeSlider.value),
+        beatsPerBar: Number(beatsPerBarSelect.value),
+        accentEnabled: accentToggle.checked
+      };
+
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(settings));
+      } catch (error) {
+        // The metronome still works when browser storage is unavailable.
+      }
+    }
+
+    function loadSettings() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(storageKey));
+
+        if (!saved || typeof saved !== "object") return;
+
+        if (Number.isFinite(Number(saved.bpm))) {
+          bpm = Math.min(240, Math.max(30, Number(saved.bpm)));
+        }
+
+        if (Number.isFinite(Number(saved.volume))) {
+          const savedVolume = Math.min(100, Math.max(0, Number(saved.volume)));
+          volumeSlider.value = savedVolume;
+          volume = savedVolume / 100;
+        }
+
+        const validBeats = Array.from(beatsPerBarSelect.options)
+          .some(option => option.value === String(saved.beatsPerBar));
+
+        if (validBeats) {
+          beatsPerBarSelect.value = String(saved.beatsPerBar);
+        }
+
+        if (typeof saved.accentEnabled === "boolean") {
+          accentToggle.checked = saved.accentEnabled;
+        }
+      } catch (error) {
+        // Ignore invalid or unavailable saved settings.
+      }
+    }
+
+    function initAudio() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      if (audioContext.state === "suspended") {
+        audioContext.resume();
+      }
+    }
+
+    function playClick(isAccent) {
+      initAudio();
+
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+
+      oscillator.type = "square";
+      oscillator.frequency.value = isAccent ? 1200 : 820;
+
+      gain.gain.setValueAtTime(0.001, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(
+        (isAccent ? 0.95 : 0.58) * volume,
+        audioContext.currentTime + 0.005
+      );
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        audioContext.currentTime + 0.075
+      );
+
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.08);
+    }
+
+    function getInterval() {
+      return 60000 / bpm;
+    }
+
+    function formatPracticeTime(milliseconds) {
+      const totalSeconds = Math.floor(milliseconds / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      return [hours, minutes, seconds]
+        .map(value => String(value).padStart(2, "0"))
+        .join(":");
+    }
+
+    function updatePracticeTime() {
+      if (practiceStartedAt === null) {
+        practiceTime.textContent = "00:00:00";
+        return;
+      }
+
+      const runningMs = Date.now() - practiceStartedAt;
+      const visibleMs = runningMs + 1000;
+      practiceTime.textContent = formatPracticeTime(visibleMs);
+    }
+
+    function startPracticeTimer() {
+      if (practiceTimerId !== null) return;
+
+      practiceStartedAt = Date.now();
+      practiceTimer.classList.add("running");
+      updatePracticeTime();
+      practiceTimerId = setInterval(updatePracticeTime, 250);
+    }
+
+    function resetPracticeTimer() {
+      practiceStartedAt = null;
+      practiceTimer.classList.remove("running");
+      clearInterval(practiceTimerId);
+      practiceTimerId = null;
+      practiceTime.textContent = "00:00:00";
+    }
+
+    function updateBpm(newBpm, shouldSave = true) {
+      const numericBpm = Number(newBpm);
+      if (!Number.isFinite(numericBpm)) return;
+
+      bpm = Math.round(Math.min(240, Math.max(30, numericBpm)));
+      bpmNumber.value = bpm;
+      bpmSlider.value = bpm;
+
+      if (isRunning) {
+        restartTimer();
+      }
+
+      if (shouldSave) {
+        saveSettings();
+      }
+    }
+
+    function beginBpmEdit() {
+      bpmNumber.readOnly = false;
+      bpmNumber.classList.add("editing");
+      bpmNumber.select();
+    }
+
+    function finishBpmEdit() {
+      const enteredBpm = Number(bpmNumber.value);
+
+      if (Number.isFinite(enteredBpm) && bpmNumber.value !== "") {
+        updateBpm(enteredBpm);
+        statusText.textContent = `已设置 ${bpm} BPM`;
+      } else {
+        bpmNumber.value = bpm;
+        statusText.textContent = "请输入 30 到 240 之间的 BPM";
+      }
+
+      bpmNumber.readOnly = true;
+      bpmNumber.classList.remove("editing");
+    }
+
+    function createBeatDots() {
+      const beatsPerBar = Number(beatsPerBarSelect.value);
+      beatsContainer.innerHTML = "";
+
+      for (let i = 0; i < beatsPerBar; i++) {
+        const beat = document.createElement("div");
+        beat.className = "beat";
+        if (i === 0 && accentToggle.checked) beat.classList.add("accent");
+        beat.textContent = i + 1;
+        beatsContainer.appendChild(beat);
+      }
+    }
+
+    function updateBeatVisual() {
+      const beatDots = document.querySelectorAll(".beat");
+
+      beatDots.forEach((dot, index) => {
+        dot.classList.toggle("active", index === currentBeat);
+      });
+    }
+
+    function tick() {
+      const beatsPerBar = Number(beatsPerBarSelect.value);
+      const isAccentBeat = currentBeat === 0 && accentToggle.checked;
+
+      playClick(isAccentBeat);
+      updateBeatVisual();
+
+      currentBeat = (currentBeat + 1) % beatsPerBar;
+    }
+
+    function start() {
+      initAudio();
+
+      isRunning = true;
+      startStopBtn.textContent = "停止";
+      startStopBtn.classList.add("running");
+      statusText.textContent = "正在运行";
+      startPracticeTimer();
+
+      currentBeat = 0;
+      tick();
+
+      timerId = setInterval(tick, getInterval());
+    }
+
+    function stop() {
+      isRunning = false;
+      startStopBtn.textContent = "开始";
+      startStopBtn.classList.remove("running");
+      statusText.textContent = "已停止";
+      resetPracticeTimer();
+
+      clearInterval(timerId);
+      timerId = null;
+
+      document.querySelectorAll(".beat").forEach(dot => {
+        dot.classList.remove("active");
+      });
+
+      currentBeat = 0;
+    }
+
+    function toggleStartStop() {
+      if (isRunning) {
+        stop();
+      } else {
+        start();
+      }
+    }
+
+    function restartTimer() {
+      clearInterval(timerId);
+      timerId = setInterval(tick, getInterval());
+    }
+
+    function handleTapTempo() {
+      const now = Date.now();
+
+      tapTimes.push(now);
+
+      if (tapTimes.length > 5) {
+        tapTimes.shift();
+      }
+
+      if (tapTimes.length >= 2) {
+        const intervals = [];
+
+        for (let i = 1; i < tapTimes.length; i++) {
+          intervals.push(tapTimes[i] - tapTimes[i - 1]);
+        }
+
+        const averageInterval =
+          intervals.reduce((sum, value) => sum + value, 0) / intervals.length;
+
+        const tappedBpm = Math.round(60000 / averageInterval);
+
+        if (tappedBpm >= 30 && tappedBpm <= 240) {
+          updateBpm(tappedBpm);
+          statusText.textContent = `Tap Tempo：${tappedBpm} BPM`;
+        }
+      }
+
+      clearTimeout(handleTapTempo.resetTimer);
+      handleTapTempo.resetTimer = setTimeout(() => {
+        tapTimes = [];
+      }, 2000);
+    }
+
+    bpmSlider.addEventListener("input", () => {
+      updateBpm(bpmSlider.value);
+    });
+
+    bpmNumber.addEventListener("dblclick", beginBpmEdit);
+
+    bpmNumber.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        bpmNumber.blur();
+      }
+
+      if (event.key === "Escape") {
+        bpmNumber.value = bpm;
+        bpmNumber.blur();
+      }
+    });
+
+    bpmNumber.addEventListener("blur", () => {
+      if (!bpmNumber.readOnly) {
+        finishBpmEdit();
+      }
+    });
+
+    minus10.addEventListener("click", () => updateBpm(bpm - 10));
+    minus1.addEventListener("click", () => updateBpm(bpm - 1));
+    plus1.addEventListener("click", () => updateBpm(bpm + 1));
+    plus10.addEventListener("click", () => updateBpm(bpm + 10));
+
+    startStopBtn.addEventListener("click", toggleStartStop);
+    tapBtn.addEventListener("click", handleTapTempo);
+
+    volumeSlider.addEventListener("input", () => {
+      volume = Number(volumeSlider.value) / 100;
+      volumeValue.textContent = `${volumeSlider.value}%`;
+      statusText.textContent = volume === 0
+        ? "音量已静音"
+        : `音量：${volumeSlider.value}%`;
+      saveSettings();
+    });
+
+    beatsPerBarSelect.addEventListener("change", () => {
+      createBeatDots();
+      currentBeat = 0;
+      saveSettings();
+
+      if (isRunning) {
+        stop();
+        start();
+      }
+    });
+
+    accentToggle.addEventListener("change", () => {
+      createBeatDots();
+      statusText.textContent = accentToggle.checked
+        ? "第一拍重音已开启"
+        : "第一拍重音已关闭";
+      saveSettings();
+    });
+
+    document.addEventListener("pointerup", event => {
+      const control = event.target.closest("button, select, input, summary");
+
+      if (control && control !== bpmNumber) {
+        requestAnimationFrame(() => control.blur());
+      }
+    });
+
+    document.addEventListener("keydown", event => {
+      const isEditingBpm =
+        event.target === bpmNumber && !bpmNumber.readOnly;
+
+      if (event.code === "Space" && !isEditingBpm) {
+        event.preventDefault();
+        document.activeElement?.blur();
+        toggleStartStop();
+      }
+    });
+
+    loadSettings();
+    volumeValue.textContent = `${volumeSlider.value}%`;
+    createBeatDots();
+    updateBpm(bpm, false);
+  </script>
+
+
+</body></html>
